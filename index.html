@@ -1,6 +1,10 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>배드민턴 2:2 팀짜기</title>
-<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Noto+Sans+KR:wght@400;500;700&display=swap">
 <style>
 /* Layout: one-screen tablet app — slim header + toolbar, a 6×4 card grid fills the rest; dialogs slide up over it. */
@@ -102,21 +106,62 @@ textarea{flex:1;min-height:220px;resize:none;border:1.5px solid var(--line);bord
   .court-no{grid-column:1/-1;justify-self:start}
   .brand{font-size:1.4rem}
 }
+
+/* history + locked opponents */
+.opp.locked{border-color:var(--court);opacity:.85;cursor:default}
+.opp.locked .ck{background:var(--court);border-color:var(--court);color:var(--court-ink)}
+.opp .tag{font-size:.78rem;font-weight:700;color:var(--court)}
+.rounds{display:flex;flex-direction:column;gap:14px}
+.round{border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.round-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;background:var(--bg)}
+.round-head b{font-family:var(--display);font-weight:400;font-size:1.4rem}
+.round-head time{color:var(--muted);font-size:.9rem;font-variant-numeric:tabular-nums}
+.round-body{display:flex;flex-direction:column}
+.hrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--line)}
+.hrow .court-no{font-size:.95rem;padding:3px 8px}
+.hrow .pair{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.hrow .pair .chip{font-size:1.05rem;padding:4px 10px}
+.hrow .vs{font-size:1.1rem}
+.hrow.rest-row{color:var(--muted);font-size:.95rem}
+.mini{padding:6px 12px;border-radius:999px;border:1.5px solid var(--line);font-size:.88rem;font-weight:500;white-space:nowrap;background:var(--surface)}
+.mini:hover{border-color:var(--danger);color:var(--danger)}
+.mini.armed{border-color:var(--danger);background:var(--danger);color:#fff}
+.note{font-size:.92rem;color:var(--muted);line-height:1.6;padding:12px 14px;border-radius:12px;background:var(--bg)}
+@media (max-width:640px){.hrow{grid-template-columns:minmax(0,1fr) auto}.hrow .court-no{grid-column:1/-1;justify-self:start}}
 </style>
-
+<style>*{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
 <div class="app" id="app"></div>
-
 <script>
 const EXAMPLE = "다온\n규아\n민구\n승유\n이안\n찬우\n채원\n호건\n설래\n유찬\n서은\n건율\n지후\n태린\n설희\n건우\n유나\n지훈\n연아\n오준\n해인\n채연\n영일\n지민";
-const KEY = "badminton-2v2-v1";
+const KEY = "badminton-2v2-v2";
+const OLD_KEY = "badminton-2v2-v1";
 const shuttle = '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="31" r="6" fill="var(--court)"/><path d="M14.5 28 9 6h22l-5.5 22" fill="none" stroke="var(--court)" stroke-width="2.4" stroke-linejoin="round"/><path d="M16 27 15 6M20 26V6M24 27l1-21M11 15h18" stroke="var(--court)" stroke-width="1.6"/></svg>';
 
-let S = load() || { view:"input", draft:EXAMPLE, students:[], order:[], teams:[], played:{}, rests:{}, round:0 };
-let pending = null;      // student id waiting for a partner
-let sheet = null;        // {type:'team', id} | {type:'match', result}
-let clearArm = false;
+/*
+  저장 구조
+  manual : 교사가 팀 카드에서 직접 표시한 "이미 경기한 팀"  { "팀A|팀B": true }
+  rounds : '새로운 대전 짜기'로 확정한 라운드 목록
+           [{ id, no, at, matches:[{a:{id,num,names}, b:{...}}], rest:[{id,num,names}] }]
+  두 기록을 합쳐서 "이미 경기한 팀"으로 판단한다. 라운드 기록만 따로 지울 수 있다.
+*/
+let S = load() || fresh();
+let pending = null;      // 짝을 기다리는 학생 id
+let sheet = null;        // {type:'team', id} | {type:'match', result} | {type:'history'}
+let armed = null;        // 두 번 눌러 지우기: 현재 대기 중인 버튼 키
+let armTimer = null;
 
-function load(){ try{ const v = localStorage.getItem(KEY); return v ? JSON.parse(v) : null; }catch(e){ return null; } }
+function fresh(){ return { view:"input", draft:EXAMPLE, students:[], order:[], teams:[], manual:{}, rounds:[] }; }
+function load(){
+  try{
+    const v = localStorage.getItem(KEY);
+    if(v) return JSON.parse(v);
+    const old = localStorage.getItem(OLD_KEY);   // 이전 버전 기록은 직접 표시한 기록으로 옮김
+    if(old){ const o = JSON.parse(old); return { view:o.view, draft:o.draft, students:o.students||[], order:o.order||[], teams:o.teams||[], manual:o.played||{}, rounds:[] }; }
+  }catch(e){}
+  return null;
+}
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const parse = t => t.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
@@ -125,12 +170,27 @@ const teamOf = sid => S.teams.find(t => t.a === sid || t.b === sid);
 const teamById = id => S.teams.find(t => t.id === id);
 const hue = n => Math.round((n * 137.5 + 140) % 360);
 const pkey = (a,b) => a < b ? a + "|" + b : b + "|" + a;
-const isPlayed = (a,b) => !!S.played[pkey(a,b)];
 const teamNames = t => esc(stu(t.a).name) + " · " + esc(stu(t.b).name);
+const snap = t => ({ id:t.id, num:t.num, names: stu(t.a).name + " · " + stu(t.b).name });
+function roundNosFor(a,b){
+  return S.rounds.filter(r => r.matches.some(m => (m.a.id===a && m.b.id===b) || (m.a.id===b && m.b.id===a))).map(r => r.no);
+}
+const isPlayed = (a,b) => !!S.manual[pkey(a,b)] || roundNosFor(a,b).length > 0;
 const playedCount = t => S.teams.filter(o => o.id !== t.id && isPlayed(t.id, o.id)).length;
+const restCount = id => S.rounds.filter(r => r.rest.some(x => x.id === id)).length;
+const nextRoundNo = () => S.rounds.reduce((m,r) => Math.max(m, r.no), 0) + 1;
 function shuffle(a){ a = a.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; }
+function fmtTime(ms){ const d = new Date(ms); return `${d.getMonth()+1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; }
 
-/* ---------- render ---------- */
+/* 두 번 눌러 확인 (페이지 안에서 확인) */
+function arm(key){
+  if(armed === key){ armed = null; clearTimeout(armTimer); return true; }
+  armed = key; clearTimeout(armTimer);
+  armTimer = setTimeout(() => { armed = null; render(); }, 3000);
+  render(); return false;
+}
+
+/* ---------- 화면 그리기 ---------- */
 function render(){
   const app = document.getElementById("app");
   app.innerHTML = S.view === "input" ? inputView() : boardView();
@@ -158,6 +218,7 @@ function inputView(){
       <h2>미리보기 <span class="status" id="cnt">${names.length}명</span></h2>
       <div class="preview" id="preview">${names.map(n => `<span>${esc(n)}</span>`).join("")}</div>
       <div class="row" style="margin-top:auto">
+        <span class="status">명단을 바꾸면 팀과 경기 기록이 새로 시작돼요.</span>
         <span class="spacer"></span>
         <button class="btn primary" id="go" ${names.length < 2 ? "disabled" : ""}>이름 카드 만들기 →</button>
       </div>
@@ -183,7 +244,7 @@ function bindInput(){
     if(!same){
       S.students = names.map((n,i) => ({ id:"s"+i, name:n }));
       S.order = S.students.map(s => s.id);
-      S.teams = []; S.played = {}; S.rests = {}; S.round = 0;
+      S.teams = []; S.manual = {}; S.rounds = [];
     }
     S.view = "board"; pending = null; save(); render();
   };
@@ -194,7 +255,6 @@ function boardView(){
   const cols = 6, rows = Math.max(1, Math.ceil(n / cols));
   const solo = S.students.filter(s => !teamOf(s.id)).length;
   const p = pending && stu(pending);
-  // mark adjacent teammates in the same row so they look joined
   const joined = {};
   const narrow = window.matchMedia("(max-width:640px)").matches;
   const c = narrow ? 3 : cols;
@@ -212,14 +272,14 @@ function boardView(){
   }).join("");
   const hint = p
     ? `<div class="hint picking"><span class="dot"></span><span><b>${esc(p.name)}</b>의 짝을 눌러 주세요. 같은 카드를 다시 누르면 취소돼요.</span></div>`
-    : `<div class="hint"><span class="dot"></span><span>이름 두 개를 차례로 누르면 한 팀이 돼요. 팀이 된 카드를 누르면 <b>이미 경기한 팀</b>을 고르거나 팀을 풀 수 있어요.</span></div>`;
+    : `<div class="hint"><span class="dot"></span><span>이름 두 개를 차례로 누르면 한 팀이 돼요. 팀이 된 카드를 누르면 <b>이미 경기한 팀</b>을 표시하거나 팀을 풀 수 있어요.</span></div>`;
   return `
   <header class="top">
     <div class="brand">${shuttle}배드민턴 2:2 팀짜기</div>
-    <span class="status"><b>${S.teams.length}</b>팀 · 짝 없음 <b>${solo}</b>명 · ${S.round ? `<b>${S.round}</b>라운드 진행` : "아직 경기 전"}</span>
+    <span class="status"><b>${S.teams.length}</b>팀 · 짝 없음 <b>${solo}</b>명 · ${S.rounds.length ? `라운드 기록 <b>${S.rounds.length}</b>개` : "라운드 기록 없음"}</span>
     <span class="spacer"></span>
     <button class="btn" id="edit">명단 수정</button>
-    <button class="btn ${clearArm ? "warn" : ""}" id="clearRec" ${Object.keys(S.played).length ? "" : "disabled"}>${clearArm ? "한 번 더 누르면 지워요" : "경기 기록 지우기"}</button>
+    <button class="btn" id="history">경기 기록${S.rounds.length ? ` (${S.rounds.length})` : ""}</button>
     <button class="btn" id="group" ${S.teams.length ? "" : "disabled"}>팀끼리 모으기</button>
     <button class="btn primary" id="newMatch" ${S.teams.length >= 2 ? "" : "disabled"}>새로운 대전 짜기</button>
   </header>
@@ -231,18 +291,15 @@ function bindBoard(){
   document.querySelectorAll(".card").forEach(el => el.onclick = () => tapCard(el.dataset.id));
   document.getElementById("edit").onclick = () => { S.view = "input"; S.draft = S.students.map(s => s.name).join("\n"); pending = null; save(); render(); };
   document.getElementById("group").onclick = groupCards;
+  document.getElementById("history").onclick = () => { sheet = { type:"history" }; armed = null; renderSheet(); };
   document.getElementById("newMatch").onclick = () => { sheet = { type:"match", result:makeRound() }; renderSheet(); };
-  document.getElementById("clearRec").onclick = () => {
-    if(!clearArm){ clearArm = true; render(); setTimeout(() => { if(clearArm){ clearArm = false; render(); } }, 3000); return; }
-    clearArm = false; S.played = {}; S.rests = {}; S.round = 0; save(); render();
-  };
 }
 
-/* ---------- 2번: two taps make a team ---------- */
+/* ---------- 두 명 연속 선택 → 팀 ---------- */
 function tapCard(id){
   const t = teamOf(id);
   if(t && !pending){ sheet = { type:"team", id:t.id }; renderSheet(); return; }
-  if(t && pending){ return; }               // already teamed: ignore while picking
+  if(t && pending) return;
   if(!pending){ pending = id; render(); return; }
   if(pending === id){ pending = null; render(); return; }
   const used = new Set(S.teams.map(x => x.num));
@@ -252,7 +309,7 @@ function tapCard(id){
   pending = null; save(); render();
 }
 
-/* ---------- 3번: regroup cards by team ---------- */
+/* ---------- 팀끼리 모아서 다시 배치 ---------- */
 function groupCards(){
   const out = [];
   S.teams.forEach(t => out.push(t.a, t.b));
@@ -260,7 +317,7 @@ function groupCards(){
   S.order = out; save(); render();
 }
 
-/* ---------- 5번: new round avoiding played opponents ---------- */
+/* ---------- 새로운 대전: 이미 경기한 팀 제외 ---------- */
 function perfect(list){
   if(!list.length) return [];
   const [first, ...rest] = list;
@@ -278,8 +335,7 @@ function combos(arr, k, start=0, acc=[], out=[]){
 }
 function makeRound(){
   const teams = shuffle(S.teams);
-  // teams that rested least are first in line to rest
-  const restOrder = teams.slice().sort((a,b) => (S.rests[a.id]||0) - (S.rests[b.id]||0));
+  const restOrder = teams.slice().sort((a,b) => restCount(a.id) - restCount(b.id));   // 덜 쉰 팀이 먼저 쉼
   for(let k = teams.length % 2; k <= teams.length; k += 2){
     for(const restSet of combos(restOrder, k)){
       const playing = teams.filter(t => !restSet.includes(t));
@@ -290,32 +346,44 @@ function makeRound(){
   return { matches:[], rest:teams };
 }
 
-/* ---------- sheets ---------- */
+/* ---------- 창(시트) ---------- */
 function renderSheet(){
   let host = document.getElementById("sheetHost");
   if(!host){ host = document.createElement("div"); host.id = "sheetHost"; document.body.appendChild(host); }
   if(!sheet || S.view !== "board"){ host.innerHTML = ""; return; }
-  if(sheet.type === "team") host.innerHTML = teamSheet(); else host.innerHTML = matchSheet();
+  host.innerHTML = sheet.type === "team" ? teamSheet() : sheet.type === "match" ? matchSheet() : historySheet();
   const scrim = host.querySelector(".scrim");
-  scrim.onclick = e => { if(e.target === scrim){ sheet = null; renderSheet(); } };
-  host.querySelectorAll("[data-close]").forEach(b => b.onclick = () => { sheet = null; renderSheet(); });
-  if(sheet.type === "team") bindTeamSheet(host); else bindMatchSheet(host);
+  if(!scrim) return;
+  scrim.onclick = e => { if(e.target === scrim){ sheet = null; armed = null; renderSheet(); } };
+  host.querySelectorAll("[data-close]").forEach(b => b.onclick = () => { sheet = null; armed = null; renderSheet(); });
+  if(sheet.type === "team") bindTeamSheet(host);
+  else if(sheet.type === "match") bindMatchSheet(host);
+  else bindHistorySheet(host);
 }
 
-/* 4번: mark teams already played */
+/* 팀 창: 이미 경기한 팀 직접 표시 */
 function teamSheet(){
   const t = teamById(sheet.id);
   if(!t){ sheet = null; return ""; }
   const others = S.teams.filter(o => o.id !== t.id);
+  const item = o => {
+    const nos = roundNosFor(t.id, o.id);
+    if(nos.length) return `
+      <button class="opp locked" disabled style="--h:${hue(o.num)}" aria-label="${o.num}팀, 라운드에서 경기함">
+        <span class="sw"></span><span class="t"><b>${o.num}팀</b><span>${teamNames(o)}</span><span class="tag">${nos.join(", ")}라운드 경기</span></span><span class="ck">✓</span>
+      </button>`;
+    const on = !!S.manual[pkey(t.id,o.id)];
+    return `
+      <button class="opp ${on ? "on" : ""}" data-opp="${o.id}" style="--h:${hue(o.num)}" aria-pressed="${on}">
+        <span class="sw"></span><span class="t"><b>${o.num}팀</b><span>${teamNames(o)}</span></span><span class="ck">✓</span>
+      </button>`;
+  };
   return `<div class="scrim"><div class="sheet" role="dialog" aria-label="${t.num}팀">
     <h3><span class="chip" style="--h:${hue(t.num)}"><span class="n">${t.num}팀</span>${teamNames(t)}</span></h3>
-    <p class="sub">이미 경기한 팀을 눌러 표시해 주세요. 새 대전을 짤 때 표시한 팀과는 만나지 않아요.</p>
-    ${others.length ? `<div class="opp-grid">${others.map(o => `
-      <button class="opp ${isPlayed(t.id,o.id) ? "on" : ""}" data-opp="${o.id}" style="--h:${hue(o.num)}" aria-pressed="${isPlayed(t.id,o.id)}">
-        <span class="sw"></span><span class="t"><b>${o.num}팀</b><span>${teamNames(o)}</span></span><span class="ck">✓</span>
-      </button>`).join("")}</div>` : `<div class="empty">아직 다른 팀이 없어요.</div>`}
+    <p class="sub">이미 경기한 팀을 눌러 표시해 주세요. 새 대전을 짤 때 표시한 팀과는 만나지 않아요. ‘라운드 경기’로 표시된 팀은 경기 기록에서 지울 수 있어요.</p>
+    ${others.length ? `<div class="opp-grid">${others.map(item).join("")}</div>` : `<div class="empty">아직 다른 팀이 없어요.</div>`}
     <div class="row">
-      <button class="btn warn" id="breakTeam">팀 풀기</button>
+      <button class="btn ${armed === "break" ? "warn" : ""}" id="breakTeam">${armed === "break" ? "한 번 더 누르면 팀을 풀어요" : "팀 풀기"}</button>
       <span class="spacer"></span>
       <button class="btn primary" data-close>완료</button>
     </div>
@@ -325,26 +393,27 @@ function bindTeamSheet(host){
   const t = teamById(sheet.id);
   host.querySelectorAll("[data-opp]").forEach(b => b.onclick = () => {
     const k = pkey(t.id, b.dataset.opp);
-    if(S.played[k]) delete S.played[k]; else S.played[k] = true;
+    if(S.manual[k]) delete S.manual[k]; else S.manual[k] = true;
     save(); render();
   });
   host.querySelector("#breakTeam").onclick = () => {
-    Object.keys(S.played).forEach(k => { if(k.split("|").includes(t.id)) delete S.played[k]; });
-    delete S.rests[t.id];
+    if(!arm("break")) return;
+    Object.keys(S.manual).forEach(k => { if(k.split("|").includes(t.id)) delete S.manual[k]; });
     S.teams = S.teams.filter(x => x !== t);
     sheet = null; save(); render();
   };
 }
 
+/* 대전 결과 창 */
 function matchSheet(){
   const { matches, rest } = sheet.result;
   const side = t => `<div class="side"><span class="chip" style="--h:${hue(t.num)}"><span class="n">${t.num}팀</span></span><span class="who">${teamNames(t)}</span></div>`;
   return `<div class="scrim"><div class="sheet" role="dialog" aria-label="새로운 대전">
-    <h3>${S.round + 1}라운드 대전</h3>
-    <p class="sub">이미 경기한 팀끼리는 만나지 않도록 짰어요. 마음에 들지 않으면 다시 짜 보세요.</p>
+    <h3>${nextRoundNo()}라운드 대전</h3>
+    <p class="sub">이미 경기한 팀끼리는 만나지 않도록 짰어요. 확정하면 이 라운드가 경기 기록에 따로 저장돼요.</p>
     ${matches.length ? `<div class="matches">${matches.map((m,i) => `
       <div class="match"><span class="court-no">${i+1}코트</span>${side(m[0])}<span class="vs">VS</span>${side(m[1])}</div>`).join("")}</div>`
-      : `<div class="empty">남은 상대가 없어요. 모든 팀이 서로 경기했어요. ‘경기 기록 지우기’로 새로 시작할 수 있어요.</div>`}
+      : `<div class="empty">남은 상대가 없어요. 모든 팀이 서로 경기했어요. 경기 기록에서 라운드를 지우면 다시 짤 수 있어요.</div>`}
     ${rest.length && matches.length ? `<div class="rest">이번에 쉬는 팀: ${rest.map(t => `<b>${t.num}팀</b>(${teamNames(t)})`).join(", ")}</div>` : ""}
     <div class="row">
       <button class="btn" data-close>닫기</button>
@@ -358,15 +427,79 @@ function bindMatchSheet(host){
   host.querySelector("#reroll").onclick = () => { sheet.result = makeRound(); renderSheet(); };
   host.querySelector("#confirm").onclick = () => {
     const { matches, rest } = sheet.result;
-    matches.forEach(([a,b]) => S.played[pkey(a.id,b.id)] = true);
-    rest.forEach(t => S.rests[t.id] = (S.rests[t.id]||0) + 1);
-    S.round++; sheet = null; save(); render();
+    S.rounds.push({
+      id:"r"+Date.now().toString(36),
+      no: nextRoundNo(),
+      at: Date.now(),
+      matches: matches.map(([a,b]) => ({ a:snap(a), b:snap(b) })),
+      rest: rest.map(snap)
+    });
+    sheet = null; save(); render();
+  };
+}
+
+/* 경기 기록 창: 라운드별 열람·삭제 */
+function historySheet(){
+  const manualN = Object.keys(S.manual).length;
+  const chip = x => `<span class="chip" style="--h:${hue(x.num)}"><span class="n">${x.num}팀</span>${esc(x.names)}</span>`;
+  const rounds = S.rounds.slice().sort((a,b) => b.no - a.no);
+  const body = rounds.length ? `<div class="rounds">${rounds.map(r => `
+    <article class="round">
+      <div class="round-head">
+        <b>${r.no}라운드</b><time>${fmtTime(r.at)}</time>
+        <span class="spacer"></span>
+        <button class="mini ${armed === "r:"+r.id ? "armed" : ""}" data-del-round="${r.id}">${armed === "r:"+r.id ? "한 번 더 누르면 지워요" : "라운드 지우기"}</button>
+      </div>
+      <div class="round-body">
+        ${r.matches.map((m,i) => `
+          <div class="hrow">
+            <span class="court-no">${i+1}코트</span>
+            <span class="pair">${chip(m.a)}<span class="vs">VS</span>${chip(m.b)}</span>
+            <button class="mini ${armed === "m:"+r.id+":"+i ? "armed" : ""}" data-del-match="${r.id}:${i}">${armed === "m:"+r.id+":"+i ? "한 번 더" : "이 경기 지우기"}</button>
+          </div>`).join("")}
+        ${r.rest.length ? `<div class="hrow rest-row"><span></span><span>쉰 팀: ${r.rest.map(x => `${x.num}팀(${esc(x.names)})`).join(", ")}</span><span></span></div>` : ""}
+      </div>
+    </article>`).join("")}</div>`
+    : `<div class="empty">아직 확정한 라운드가 없어요. ‘새로운 대전 짜기’에서 대전을 확정하면 여기에 쌓여요.</div>`;
+  return `<div class="scrim"><div class="sheet" role="dialog" aria-label="경기 기록">
+    <h3>경기 기록</h3>
+    <p class="sub">이 앱에서 짠 라운드만 여기에 보여요. 경기나 라운드를 지우면 그 팀들은 다시 만날 수 있어요.</p>
+    ${body}
+    <div class="note">팀 카드에서 직접 표시한 ‘이미 경기한 팀’ ${manualN}건은 라운드 기록과 따로 보관돼요. 라운드를 지워도 그대로 남고, 팀 카드를 눌러 하나씩 해제할 수 있어요.</div>
+    <div class="row">
+      <button class="btn ${armed === "allRounds" ? "warn" : ""}" id="delAll" ${S.rounds.length ? "" : "disabled"}>${armed === "allRounds" ? "한 번 더 누르면 모든 라운드를 지워요" : "라운드 기록 모두 지우기"}</button>
+      <span class="spacer"></span>
+      <button class="btn primary" data-close>닫기</button>
+    </div>
+  </div></div>`;
+}
+function bindHistorySheet(host){
+  host.querySelectorAll("[data-del-round]").forEach(b => b.onclick = () => {
+    const id = b.dataset.delRound;
+    if(!arm("r:"+id)) return;
+    S.rounds = S.rounds.filter(r => r.id !== id);
+    save(); render();
+  });
+  host.querySelectorAll("[data-del-match]").forEach(b => b.onclick = () => {
+    const [rid, idx] = b.dataset.delMatch.split(":");
+    if(!arm("m:"+rid+":"+idx)) return;
+    const r = S.rounds.find(x => x.id === rid);
+    if(r){
+      const m = r.matches.splice(Number(idx), 1)[0];
+      if(!r.matches.length) S.rounds = S.rounds.filter(x => x !== r);
+    }
+    save(); render();
+  });
+  host.querySelector("#delAll").onclick = () => {
+    if(!arm("allRounds")) return;
+    S.rounds = []; save(); render();
   };
 }
 
 window.addEventListener("resize", () => { if(S.view === "board") render(); });
-document.addEventListener("keydown", e => { if(e.key === "Escape"){ if(sheet){ sheet = null; renderSheet(); } else if(pending){ pending = null; render(); } } });
+document.addEventListener("keydown", e => { if(e.key === "Escape"){ if(sheet){ sheet = null; armed = null; renderSheet(); } else if(pending){ pending = null; render(); } } });
 render();
 </script>
 
-</body></html>
+</body>
+</html>
