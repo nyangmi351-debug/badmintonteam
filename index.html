@@ -1,0 +1,372 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>배드민턴 2:2 팀짜기</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: one-screen tablet app — slim header + toolbar, a 6×4 card grid fills the rest; dialogs slide up over it. */
+:root{
+  --bg:#e9f0ea; --surface:#ffffff; --ink:#18261e; --muted:#5e7066; --line:#cfdcd2;
+  --court:#1d7a52; --court-ink:#ffffff; --pending:#f2b632; --danger:#c2412d;
+  --team-s:62%; --team-l:46%; --team-soft-l:92%;
+  --display:"Do Hyeon","Noto Sans KR",system-ui,sans-serif;
+  --body:"Noto Sans KR",system-ui,-apple-system,sans-serif;
+  --r:14px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1712; --surface:#17241c; --ink:#e6efe8; --muted:#93a69a; --line:#2a3b31;
+  --court:#2f9a6b; --court-ink:#06130c; --pending:#f2c14e; --danger:#ef6a52;
+  --team-s:55%; --team-l:62%; --team-soft-l:20%; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1712; --surface:#17241c; --ink:#e6efe8; --muted:#93a69a; --line:#2a3b31;
+  --court:#2f9a6b; --court-ink:#06130c; --pending:#f2c14e; --danger:#ef6a52;
+  --team-s:55%; --team-l:62%; --team-soft-l:20%; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible,textarea:focus-visible{outline:3px solid var(--pending);outline-offset:2px}
+.app{height:100%;display:flex;flex-direction:column;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px;gap:12px;box-sizing:border-box}
+
+/* header */
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-size:1.7rem;line-height:1}
+.brand svg{width:34px;height:34px;flex:none}
+.status{color:var(--muted);font-size:.95rem;font-variant-numeric:tabular-nums}
+.status b{color:var(--ink);font-weight:700}
+.spacer{flex:1}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);font-weight:500;font-size:.98rem;white-space:nowrap}
+.btn:hover{border-color:var(--court)}
+.btn.primary{background:var(--court);border-color:var(--court);color:var(--court-ink);font-weight:700}
+.btn.warn{color:var(--danger);border-color:var(--danger)}
+.btn:disabled{opacity:.45;cursor:default}
+
+/* input screen */
+.input-wrap{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:20px;align-items:stretch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;display:flex;flex-direction:column;gap:12px;min-height:0}
+.panel h2{margin:0;font-family:var(--display);font-weight:400;font-size:1.5rem}
+.panel p{margin:0;color:var(--muted);line-height:1.6}
+textarea{flex:1;min-height:220px;resize:none;border:1.5px solid var(--line);border-radius:10px;padding:14px;font:500 1.1rem/1.7 var(--body);background:var(--bg);color:var(--ink)}
+.preview{display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;overflow:auto}
+.preview span{padding:6px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--line);font-family:var(--display);font-size:1.15rem}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+/* board */
+.hint{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 14px;border-radius:12px;background:var(--surface);border:1px solid var(--line);font-size:.98rem}
+.hint .dot{width:10px;height:10px;border-radius:50%;background:var(--court);flex:none}
+.hint.picking .dot{background:var(--pending)}
+.board{flex:1;min-height:0;display:grid;grid-template-columns:repeat(var(--cols),minmax(0,1fr));grid-template-rows:repeat(var(--rows),minmax(0,1fr));gap:10px}
+.card{position:relative;display:flex;flex-direction:column;border-radius:var(--r);background:var(--surface);border:2px solid var(--line);overflow:hidden;transition:transform .15s,box-shadow .15s,border-color .15s;min-width:0}
+.card .name{flex:1;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:clamp(1.5rem,4.2vw,3.4rem);line-height:1;padding:6px;text-align:center;word-break:keep-all}
+.card .band{height:30%;max-height:44px;min-height:26px;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:.92rem;color:var(--muted);border-top:2px dashed var(--line)}
+.card.teamed{border-color:hsl(var(--h) var(--team-s) var(--team-l));background:hsl(var(--h) 60% var(--team-soft-l))}
+.card.teamed .band{border-top:0;background:hsl(var(--h) var(--team-s) var(--team-l));color:#fff}
+.card.teamed .band small{font-weight:500;opacity:.9}
+.card.pending{border-color:var(--pending);box-shadow:0 0 0 4px color-mix(in srgb,var(--pending) 40%,transparent);transform:translateY(-3px)}
+.card.pending .band{color:var(--ink);background:color-mix(in srgb,var(--pending) 35%,transparent);border-top:0}
+.card.pl{border-top-right-radius:4px;border-bottom-right-radius:4px;margin-right:-6px}
+.card.pr{border-top-left-radius:4px;border-bottom-left-radius:4px;margin-left:-6px}
+.card:active{transform:scale(.98)}
+
+/* overlay sheets */
+.scrim{position:fixed;inset:0;background:rgba(8,20,12,.45);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom,0px))}
+.sheet{width:min(860px,100%);max-height:88%;overflow:auto;background:var(--surface);border-radius:20px;padding:22px;display:flex;flex-direction:column;gap:16px;box-sizing:border-box;animation:up .2s ease-out}
+@keyframes up{from{transform:translateY(24px);opacity:.6}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}.card{transition:none}}
+.sheet h3{margin:0;font-family:var(--display);font-weight:400;font-size:1.8rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sheet .sub{color:var(--muted);margin:0}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;background:hsl(var(--h) var(--team-s) var(--team-l));color:#fff;font-family:var(--display);font-size:1.25rem;line-height:1.2}
+.chip .n{background:rgba(255,255,255,.25);border-radius:999px;padding:0 8px;font-size:1rem}
+.opp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.opp{display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;border:2px solid var(--line);text-align:left;background:var(--bg)}
+.opp .sw{width:14px;height:14px;border-radius:4px;background:hsl(var(--h) var(--team-s) var(--team-l));flex:none}
+.opp .t{display:flex;flex-direction:column;min-width:0}
+.opp .t b{font-family:var(--display);font-weight:400;font-size:1.2rem}
+.opp .t span{font-size:.85rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opp .ck{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;flex:none;font-weight:700;color:transparent}
+.opp.on{border-color:var(--court)}
+.opp.on .ck{background:var(--court);border-color:var(--court);color:var(--court-ink)}
+.matches{display:flex;flex-direction:column;gap:10px}
+.match{display:grid;grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px;padding:14px;border-radius:14px;background:var(--bg);border:1px solid var(--line)}
+.court-no{font-family:var(--display);font-size:1.1rem;color:var(--court);writing-mode:horizontal-tb;padding:6px 10px;border-radius:8px;border:1.5px solid var(--court);white-space:nowrap}
+.side{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}
+.side:last-child{align-items:flex-end;text-align:right}
+.side .who{font-family:var(--display);font-size:1.6rem;line-height:1.1}
+.vs{font-family:var(--display);font-size:1.4rem;color:var(--muted)}
+.rest{padding:12px 14px;border-radius:12px;border:1.5px dashed var(--line);color:var(--muted)}
+.empty{padding:20px;text-align:center;color:var(--muted);border:1.5px dashed var(--line);border-radius:14px}
+
+@media (max-width:640px){
+  .input-wrap{grid-template-columns:1fr;overflow:auto}
+  .board{grid-template-rows:none;grid-auto-rows:92px;overflow:auto}
+  .card .name{font-size:1.6rem}
+  .match{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}
+  .court-no{grid-column:1/-1;justify-self:start}
+  .brand{font-size:1.4rem}
+}
+</style>
+
+<div class="app" id="app"></div>
+
+<script>
+const EXAMPLE = "다온\n규아\n민구\n승유\n이안\n찬우\n채원\n호건\n설래\n유찬\n서은\n건율\n지후\n태린\n설희\n건우\n유나\n지훈\n연아\n오준\n해인\n채연\n영일\n지민";
+const KEY = "badminton-2v2-v1";
+const shuttle = '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="31" r="6" fill="var(--court)"/><path d="M14.5 28 9 6h22l-5.5 22" fill="none" stroke="var(--court)" stroke-width="2.4" stroke-linejoin="round"/><path d="M16 27 15 6M20 26V6M24 27l1-21M11 15h18" stroke="var(--court)" stroke-width="1.6"/></svg>';
+
+let S = load() || { view:"input", draft:EXAMPLE, students:[], order:[], teams:[], played:{}, rests:{}, round:0 };
+let pending = null;      // student id waiting for a partner
+let sheet = null;        // {type:'team', id} | {type:'match', result}
+let clearArm = false;
+
+function load(){ try{ const v = localStorage.getItem(KEY); return v ? JSON.parse(v) : null; }catch(e){ return null; } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const parse = t => t.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+const stu = id => S.students.find(s => s.id === id);
+const teamOf = sid => S.teams.find(t => t.a === sid || t.b === sid);
+const teamById = id => S.teams.find(t => t.id === id);
+const hue = n => Math.round((n * 137.5 + 140) % 360);
+const pkey = (a,b) => a < b ? a + "|" + b : b + "|" + a;
+const isPlayed = (a,b) => !!S.played[pkey(a,b)];
+const teamNames = t => esc(stu(t.a).name) + " · " + esc(stu(t.b).name);
+const playedCount = t => S.teams.filter(o => o.id !== t.id && isPlayed(t.id, o.id)).length;
+function shuffle(a){ a = a.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; }
+
+/* ---------- render ---------- */
+function render(){
+  const app = document.getElementById("app");
+  app.innerHTML = S.view === "input" ? inputView() : boardView();
+  if(S.view === "input") bindInput(); else bindBoard();
+  renderSheet();
+}
+
+function inputView(){
+  const names = parse(S.draft);
+  return `
+  <header class="top">
+    <div class="brand">${shuttle}배드민턴 2:2 팀짜기</div>
+  </header>
+  <div class="input-wrap">
+    <section class="panel">
+      <h2>학생 이름 입력</h2>
+      <p>한 줄에 한 명씩, 엔터로 구분해서 적어 주세요.</p>
+      <textarea id="names" spellcheck="false" aria-label="학생 이름 목록">${esc(S.draft)}</textarea>
+      <div class="row">
+        <button class="btn" id="clearNames">모두 지우기</button>
+        <button class="btn" id="sample">예시 이름 넣기</button>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>미리보기 <span class="status" id="cnt">${names.length}명</span></h2>
+      <div class="preview" id="preview">${names.map(n => `<span>${esc(n)}</span>`).join("")}</div>
+      <div class="row" style="margin-top:auto">
+        <span class="spacer"></span>
+        <button class="btn primary" id="go" ${names.length < 2 ? "disabled" : ""}>이름 카드 만들기 →</button>
+      </div>
+    </section>
+  </div>`;
+}
+
+function bindInput(){
+  const ta = document.getElementById("names");
+  const refresh = () => {
+    S.draft = ta.value; save();
+    const n = parse(ta.value);
+    document.getElementById("cnt").textContent = n.length + "명";
+    document.getElementById("preview").innerHTML = n.map(x => `<span>${esc(x)}</span>`).join("");
+    document.getElementById("go").disabled = n.length < 2;
+  };
+  ta.addEventListener("input", refresh);
+  document.getElementById("sample").onclick = () => { ta.value = EXAMPLE; refresh(); };
+  document.getElementById("clearNames").onclick = () => { ta.value = ""; refresh(); ta.focus(); };
+  document.getElementById("go").onclick = () => {
+    const names = parse(S.draft);
+    const same = names.length === S.students.length && names.every((n,i) => S.students[i] && S.students[i].name === n);
+    if(!same){
+      S.students = names.map((n,i) => ({ id:"s"+i, name:n }));
+      S.order = S.students.map(s => s.id);
+      S.teams = []; S.played = {}; S.rests = {}; S.round = 0;
+    }
+    S.view = "board"; pending = null; save(); render();
+  };
+}
+
+function boardView(){
+  const n = S.order.length;
+  const cols = 6, rows = Math.max(1, Math.ceil(n / cols));
+  const solo = S.students.filter(s => !teamOf(s.id)).length;
+  const p = pending && stu(pending);
+  // mark adjacent teammates in the same row so they look joined
+  const joined = {};
+  const narrow = window.matchMedia("(max-width:640px)").matches;
+  const c = narrow ? 3 : cols;
+  for(let i=0;i<n-1;i++){
+    if(joined[i]) continue;
+    const t = teamOf(S.order[i]);
+    if(t && teamOf(S.order[i+1]) === t && (i % c) !== c-1){ joined[i] = "pl"; joined[i+1] = "pr"; }
+  }
+  const cards = S.order.map((id,i) => {
+    const s = stu(id), t = teamOf(id);
+    const cls = ["card", t ? "teamed" : "", pending === id ? "pending" : "", joined[i] || ""].join(" ");
+    const band = t ? `${t.num}팀 <small>· ${playedCount(t)}경기</small>` : (pending === id ? "짝 고르는 중" : "짝 없음");
+    return `<button class="${cls}" data-id="${id}" ${t ? `style="--h:${hue(t.num)}"` : ""} aria-label="${esc(s.name)} ${t ? t.num+'팀' : '짝 없음'}">
+      <span class="name">${esc(s.name)}</span><span class="band">${band}</span></button>`;
+  }).join("");
+  const hint = p
+    ? `<div class="hint picking"><span class="dot"></span><span><b>${esc(p.name)}</b>의 짝을 눌러 주세요. 같은 카드를 다시 누르면 취소돼요.</span></div>`
+    : `<div class="hint"><span class="dot"></span><span>이름 두 개를 차례로 누르면 한 팀이 돼요. 팀이 된 카드를 누르면 <b>이미 경기한 팀</b>을 고르거나 팀을 풀 수 있어요.</span></div>`;
+  return `
+  <header class="top">
+    <div class="brand">${shuttle}배드민턴 2:2 팀짜기</div>
+    <span class="status"><b>${S.teams.length}</b>팀 · 짝 없음 <b>${solo}</b>명 · ${S.round ? `<b>${S.round}</b>라운드 진행` : "아직 경기 전"}</span>
+    <span class="spacer"></span>
+    <button class="btn" id="edit">명단 수정</button>
+    <button class="btn ${clearArm ? "warn" : ""}" id="clearRec" ${Object.keys(S.played).length ? "" : "disabled"}>${clearArm ? "한 번 더 누르면 지워요" : "경기 기록 지우기"}</button>
+    <button class="btn" id="group" ${S.teams.length ? "" : "disabled"}>팀끼리 모으기</button>
+    <button class="btn primary" id="newMatch" ${S.teams.length >= 2 ? "" : "disabled"}>새로운 대전 짜기</button>
+  </header>
+  ${hint}
+  <div class="board" style="--cols:${cols};--rows:${rows}">${cards}</div>`;
+}
+
+function bindBoard(){
+  document.querySelectorAll(".card").forEach(el => el.onclick = () => tapCard(el.dataset.id));
+  document.getElementById("edit").onclick = () => { S.view = "input"; S.draft = S.students.map(s => s.name).join("\n"); pending = null; save(); render(); };
+  document.getElementById("group").onclick = groupCards;
+  document.getElementById("newMatch").onclick = () => { sheet = { type:"match", result:makeRound() }; renderSheet(); };
+  document.getElementById("clearRec").onclick = () => {
+    if(!clearArm){ clearArm = true; render(); setTimeout(() => { if(clearArm){ clearArm = false; render(); } }, 3000); return; }
+    clearArm = false; S.played = {}; S.rests = {}; S.round = 0; save(); render();
+  };
+}
+
+/* ---------- 2번: two taps make a team ---------- */
+function tapCard(id){
+  const t = teamOf(id);
+  if(t && !pending){ sheet = { type:"team", id:t.id }; renderSheet(); return; }
+  if(t && pending){ return; }               // already teamed: ignore while picking
+  if(!pending){ pending = id; render(); return; }
+  if(pending === id){ pending = null; render(); return; }
+  const used = new Set(S.teams.map(x => x.num));
+  let num = 1; while(used.has(num)) num++;
+  S.teams.push({ id:"t"+Date.now().toString(36)+num, num, a:pending, b:id });
+  S.teams.sort((x,y) => x.num - y.num);
+  pending = null; save(); render();
+}
+
+/* ---------- 3번: regroup cards by team ---------- */
+function groupCards(){
+  const out = [];
+  S.teams.forEach(t => out.push(t.a, t.b));
+  S.order.forEach(id => { if(!teamOf(id)) out.push(id); });
+  S.order = out; save(); render();
+}
+
+/* ---------- 5번: new round avoiding played opponents ---------- */
+function perfect(list){
+  if(!list.length) return [];
+  const [first, ...rest] = list;
+  for(const o of shuffle(rest)){
+    if(isPlayed(first.id, o.id)) continue;
+    const sub = perfect(rest.filter(x => x !== o));
+    if(sub) return [[first, o], ...sub];
+  }
+  return null;
+}
+function combos(arr, k, start=0, acc=[], out=[]){
+  if(acc.length === k){ out.push(acc.slice()); return out; }
+  for(let i=start;i<arr.length && out.length < 4000;i++){ acc.push(arr[i]); combos(arr, k, i+1, acc, out); acc.pop(); }
+  return out;
+}
+function makeRound(){
+  const teams = shuffle(S.teams);
+  // teams that rested least are first in line to rest
+  const restOrder = teams.slice().sort((a,b) => (S.rests[a.id]||0) - (S.rests[b.id]||0));
+  for(let k = teams.length % 2; k <= teams.length; k += 2){
+    for(const restSet of combos(restOrder, k)){
+      const playing = teams.filter(t => !restSet.includes(t));
+      const m = perfect(playing);
+      if(m) return { matches:m, rest:restSet };
+    }
+  }
+  return { matches:[], rest:teams };
+}
+
+/* ---------- sheets ---------- */
+function renderSheet(){
+  let host = document.getElementById("sheetHost");
+  if(!host){ host = document.createElement("div"); host.id = "sheetHost"; document.body.appendChild(host); }
+  if(!sheet || S.view !== "board"){ host.innerHTML = ""; return; }
+  if(sheet.type === "team") host.innerHTML = teamSheet(); else host.innerHTML = matchSheet();
+  const scrim = host.querySelector(".scrim");
+  scrim.onclick = e => { if(e.target === scrim){ sheet = null; renderSheet(); } };
+  host.querySelectorAll("[data-close]").forEach(b => b.onclick = () => { sheet = null; renderSheet(); });
+  if(sheet.type === "team") bindTeamSheet(host); else bindMatchSheet(host);
+}
+
+/* 4번: mark teams already played */
+function teamSheet(){
+  const t = teamById(sheet.id);
+  if(!t){ sheet = null; return ""; }
+  const others = S.teams.filter(o => o.id !== t.id);
+  return `<div class="scrim"><div class="sheet" role="dialog" aria-label="${t.num}팀">
+    <h3><span class="chip" style="--h:${hue(t.num)}"><span class="n">${t.num}팀</span>${teamNames(t)}</span></h3>
+    <p class="sub">이미 경기한 팀을 눌러 표시해 주세요. 새 대전을 짤 때 표시한 팀과는 만나지 않아요.</p>
+    ${others.length ? `<div class="opp-grid">${others.map(o => `
+      <button class="opp ${isPlayed(t.id,o.id) ? "on" : ""}" data-opp="${o.id}" style="--h:${hue(o.num)}" aria-pressed="${isPlayed(t.id,o.id)}">
+        <span class="sw"></span><span class="t"><b>${o.num}팀</b><span>${teamNames(o)}</span></span><span class="ck">✓</span>
+      </button>`).join("")}</div>` : `<div class="empty">아직 다른 팀이 없어요.</div>`}
+    <div class="row">
+      <button class="btn warn" id="breakTeam">팀 풀기</button>
+      <span class="spacer"></span>
+      <button class="btn primary" data-close>완료</button>
+    </div>
+  </div></div>`;
+}
+function bindTeamSheet(host){
+  const t = teamById(sheet.id);
+  host.querySelectorAll("[data-opp]").forEach(b => b.onclick = () => {
+    const k = pkey(t.id, b.dataset.opp);
+    if(S.played[k]) delete S.played[k]; else S.played[k] = true;
+    save(); render();
+  });
+  host.querySelector("#breakTeam").onclick = () => {
+    Object.keys(S.played).forEach(k => { if(k.split("|").includes(t.id)) delete S.played[k]; });
+    delete S.rests[t.id];
+    S.teams = S.teams.filter(x => x !== t);
+    sheet = null; save(); render();
+  };
+}
+
+function matchSheet(){
+  const { matches, rest } = sheet.result;
+  const side = t => `<div class="side"><span class="chip" style="--h:${hue(t.num)}"><span class="n">${t.num}팀</span></span><span class="who">${teamNames(t)}</span></div>`;
+  return `<div class="scrim"><div class="sheet" role="dialog" aria-label="새로운 대전">
+    <h3>${S.round + 1}라운드 대전</h3>
+    <p class="sub">이미 경기한 팀끼리는 만나지 않도록 짰어요. 마음에 들지 않으면 다시 짜 보세요.</p>
+    ${matches.length ? `<div class="matches">${matches.map((m,i) => `
+      <div class="match"><span class="court-no">${i+1}코트</span>${side(m[0])}<span class="vs">VS</span>${side(m[1])}</div>`).join("")}</div>`
+      : `<div class="empty">남은 상대가 없어요. 모든 팀이 서로 경기했어요. ‘경기 기록 지우기’로 새로 시작할 수 있어요.</div>`}
+    ${rest.length && matches.length ? `<div class="rest">이번에 쉬는 팀: ${rest.map(t => `<b>${t.num}팀</b>(${teamNames(t)})`).join(", ")}</div>` : ""}
+    <div class="row">
+      <button class="btn" data-close>닫기</button>
+      <span class="spacer"></span>
+      <button class="btn" id="reroll">다시 짜기</button>
+      <button class="btn primary" id="confirm" ${matches.length ? "" : "disabled"}>이 대전으로 확정</button>
+    </div>
+  </div></div>`;
+}
+function bindMatchSheet(host){
+  host.querySelector("#reroll").onclick = () => { sheet.result = makeRound(); renderSheet(); };
+  host.querySelector("#confirm").onclick = () => {
+    const { matches, rest } = sheet.result;
+    matches.forEach(([a,b]) => S.played[pkey(a.id,b.id)] = true);
+    rest.forEach(t => S.rests[t.id] = (S.rests[t.id]||0) + 1);
+    S.round++; sheet = null; save(); render();
+  };
+}
+
+window.addEventListener("resize", () => { if(S.view === "board") render(); });
+document.addEventListener("keydown", e => { if(e.key === "Escape"){ if(sheet){ sheet = null; renderSheet(); } else if(pending){ pending = null; render(); } } });
+render();
+</script>
+
+</body></html>
